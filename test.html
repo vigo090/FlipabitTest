@@ -27,15 +27,21 @@
     box-sizing:border-box;
     background:transparent !important; /* force transparency */
   }
-  .chat {
-    flex:1;
-    overflow:auto;
-    padding:8px;
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    background:transparent !important; /* transparent behind bubbles */
-  }
+.chat {
+  flex:1;
+  overflow:auto;
+  padding:8px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  background:transparent !important;
+
+  /* add centered logo */
+  background-image: url("logo.png");   /* replace with your logo */
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: 150px; /* adjust size */
+}
   .row { display:flex; max-width:90%; align-items:flex-end; }
   .row.user { justify-content:flex-end; margin-left:auto; }
   .bubble {
@@ -156,3 +162,4 @@
 </script>
 </body>
 </html>
+
