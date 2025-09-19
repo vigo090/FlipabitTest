@@ -5,27 +5,34 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Medic Diagnosis Bot</title>
 <style>
-  /* Transparent background so Flipabit page shows through */
-  :root { --accent: #0b84ff; --user-bg: #e6f0ff; --assist-bg: rgba(255,255,255,0.06); }
-  html,body{height:100%;margin:0;background:transparent;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-  .wrap{display:flex;flex-direction:column;height:100%;min-height:300px;gap:8px;padding:12px;box-sizing:border-box}
-  .chat{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:8px}
+  :root { --accent: #0b84ff; }
+  html,body{
+    height:100%;margin:0;
+    background:transparent;      /* full transparency */
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+  }
+  .wrap{display:flex;flex-direction:column;height:100%;gap:8px;padding:12px;box-sizing:border-box;background:transparent}
+  .chat{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:8px;background:transparent}
   .row{display:flex;max-width:90%;align-items:flex-end}
   .row.user{justify-content:flex-end;margin-left:auto}
   .bubble{padding:10px 12px;border-radius:12px;line-height:1.35;word-wrap:break-word;box-shadow:0 1px 0 rgba(0,0,0,0.06)}
-  .bubble.user{background:var(--user-bg);color:#04212a;border-bottom-right-radius:6px}
-  .bubble.assist{background:var(--assist-bg);color:#fff;border-bottom-left-radius:6px}
-  .meta{font-size:11px;opacity:.7;margin-top:4px}
-  .inputRow{display:flex;gap:8px}
-  textarea{flex:1;min-height:44px;max-height:140px;resize:vertical;padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.08);box-sizing:border-box}
-  button{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:8px;cursor:pointer}
+  .bubble.user{background:rgba(11,132,255,0.25);color:#fff;border-bottom-right-radius:6px}
+  .bubble.assist{background:rgba(0,0,0,0.45);color:#fff;border-bottom-left-radius:6px;backdrop-filter: blur(4px)}
+  .inputRow{display:flex;gap:8px;background:transparent}
+  textarea{
+    flex:1;min-height:44px;max-height:140px;resize:vertical;
+    padding:8px;border-radius:8px;
+    border:1px solid rgba(255,255,255,0.3);
+    background:transparent;      /* removed solid background */
+    color:#fff;
+  }
+  button{
+    background:rgba(11,132,255,0.8);
+    color:#fff;border:none;padding:10px 14px;border-radius:8px;cursor:pointer
+  }
   button[disabled]{opacity:.6;cursor:not-allowed}
   .small{font-size:12px;color:rgba(255,255,255,0.75)}
   .status{font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px}
-  .typing{font-style:italic;opacity:.9}
-  /* make sure bubbles contrast on transparent backgrounds */
-  .bubble.assist{backdrop-filter: blur(4px); background: rgba(0,0,0,0.35);}
-  @media (max-width:420px){.wrap{padding:8px}}
 </style>
 </head>
 <body>
@@ -35,14 +42,11 @@
       <span class="small" id="info">Connected</span>
     </div>
 
-    <div id="chat" class="chat" aria-live="polite" role="log">
-      <!-- messages will appear here -->
-    </div>
-
-    <div class="status small" id="status" aria-hidden="true"></div>
+    <div id="chat" class="chat"></div>
+    <div class="status small" id="status"></div>
 
     <div class="inputRow">
-      <textarea id="msg" placeholder="Type your message..." aria-label="Message"></textarea>
+      <textarea id="msg" placeholder="Type your message..."></textarea>
       <button id="send">Send</button>
     </div>
   </div>
@@ -55,120 +59,43 @@
   const sendBtn = document.getElementById('send');
   const status = document.getElementById('status');
   const info = document.getElementById('info');
-
   let sending = false;
-  let conversation = []; // local message history
-
-  function now(){ return new Date().toLocaleTimeString(); }
 
   function addMessage(text, who){
     const row = document.createElement('div');
     row.className = 'row ' + (who === 'user' ? 'user' : 'assist');
-
     const bubble = document.createElement('div');
     bubble.className = 'bubble ' + (who === 'user' ? 'user' : 'assist');
     bubble.textContent = text;
-
     row.appendChild(bubble);
     chat.appendChild(row);
     chat.scrollTop = chat.scrollHeight;
   }
 
-  function setStatus(t){
-    status.textContent = t || '';
-  }
-
   async function callApi(message){
-    // Basic guard to prevent multiple concurrent sends
     if(sending) return;
-    sending = true;
-    sendBtn.disabled = true;
-    setStatus('Sending…');
-
+    sending = true; sendBtn.disabled = true; status.textContent = 'Sending…';
     try{
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message })
-      });
-
-      // If response isn't JSON, throw
-      const data = await res.json().catch(()=>{ throw new Error('Invalid JSON from API'); });
-
-      // ApiFreeLLM example fields: { status: "success"|"error"|"rate_limited", response: "..." , retry_after: N }
-      if(data.status === 'rate_limited'){
-        const retry = data.retry_after || 5;
-        setStatus(`Rate limited — retry after ${retry}s`);
-        // optional: auto-wait then retry once
-        await new Promise(r=>setTimeout(r, retry*1000));
-        setStatus('Retrying…');
-        // try again once
-        const retryRes = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message })
-        });
-        const retryData = await retryRes.json().catch(()=>({ status:'error', response:'Invalid JSON on retry' }));
-        sending = false;
-        sendBtn.disabled = false;
-        if(retryData.status === 'success'){
-          return retryData.response || 'No response';
-        } else {
-          throw new Error(retryData.response || 'API returned error on retry');
-        }
-      } else if(data.status === 'success'){
-        setStatus('');
-        return data.response || 'No response';
-      } else {
-        // handle generic error
-        throw new Error(data.response || 'API error: ' + (data.status || 'unknown'));
-      }
-    } catch (err){
-      setStatus('Error: ' + (err.message || err));
-      throw err;
-    } finally {
-      sending = false;
-      sendBtn.disabled = false;
-    }
+      const res = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ message })});
+      const data = await res.json();
+      if(data.status==='success'){ status.textContent=''; return data.response; }
+      throw new Error(data.response||'API error');
+    }catch(e){ status.textContent='Error: '+(e.message||e); throw e; }
+    finally{ sending=false; sendBtn.disabled=false; }
   }
 
-  // Send flow
   async function send(){
-    const text = msg.value.trim();
-    if(!text) return;
-    msg.value = '';
-    addMessage(text, 'user');
-    addMessage('…', 'assist');              // temporary typing bubble
-    const assistBubble = chat.lastChild;
-    chat.scrollTop = chat.scrollHeight;
-
-    try{
-      const reply = await callApi(text);
-      // replace typing bubble with real message
-      assistBubble.remove();
-      addMessage(reply, 'assist');
-      setStatus('');
-    } catch(e){
-      // replace typing bubble with error
-      assistBubble.remove();
-      addMessage('Error: ' + (e.message || 'Request failed'), 'assist');
-    }
+    const text = msg.value.trim(); if(!text) return;
+    msg.value=''; addMessage(text,'user'); addMessage('…','assist');
+    const bubble = chat.lastChild;
+    try{ const reply = await callApi(text); bubble.remove(); addMessage(reply,'assist'); }
+    catch(e){ bubble.remove(); addMessage('Error: '+(e.message||'Request failed'),'assist'); }
   }
 
   sendBtn.addEventListener('click', send);
-  msg.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
+  msg.addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); } });
 
-  // quick connectivity check (optional): try a tiny HEAD fetch to API origin to detect CORS/network problems
-  (async function connectivityCheck(){
-    try{
-      const probe = await fetch(API_URL, { method: 'OPTIONS' });
-      info.textContent = 'Connected';
-    }catch(e){
-      info.textContent = 'Network/CORS?';
-      setStatus('If chat fails, Flipabit may block cross-origin requests. Use a proxy if needed.');
-    }
-  })();
-
+  (async()=>{try{await fetch(API_URL,{method:'OPTIONS'}); info.textContent='Connected';}catch(e){info.textContent='Network/CORS?';}})();
 })();
 </script>
 </body>
