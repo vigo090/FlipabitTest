@@ -5,45 +5,88 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Medic Diagnosis Bot</title>
 <style>
-  :root { --accent: #0b84ff; }
-  html,body{
-    height:100%;margin:0;
-    background:transparent;      /* full transparency */
+  :root {
+    --accent: #0b84ff;
+    --user-bg: rgba(11,132,255,0.2); /* semi-transparent */
+    --assist-bg: rgba(0,0,0,0.35);
+  }
+  html, body {
+    height:100%;
+    margin:0;
+    background:transparent !important;
     font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
   }
-  .wrap{display:flex;flex-direction:column;height:100%;gap:8px;padding:12px;box-sizing:border-box;background:transparent}
-  .chat{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:8px;background:transparent}
-  .row{display:flex;max-width:90%;align-items:flex-end}
-  .row.user{justify-content:flex-end;margin-left:auto}
-  .bubble{padding:10px 12px;border-radius:12px;line-height:1.35;word-wrap:break-word;box-shadow:0 1px 0 rgba(0,0,0,0.06)}
-  .bubble.user{background:rgba(11,132,255,0.25);color:#fff;border-bottom-right-radius:6px}
-  .bubble.assist{background:rgba(0,0,0,0.45);color:#fff;border-bottom-left-radius:6px;backdrop-filter: blur(4px)}
-  .inputRow{display:flex;gap:8px;background:transparent}
-  textarea{
-    flex:1;min-height:44px;max-height:140px;resize:vertical;
-    padding:8px;border-radius:8px;
+  .wrap {
+    display:flex;
+    flex-direction:column;
+    height:100%;
+    min-height:300px;
+    gap:8px;
+    padding:12px;
+    box-sizing:border-box;
+    background:transparent !important; /* force transparent */
+  }
+  .chat {
+    flex:1;
+    overflow:auto;
+    padding:8px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    background:transparent !important;
+  }
+  .row { display:flex; max-width:90%; align-items:flex-end; }
+  .row.user { justify-content:flex-end; margin-left:auto; }
+  .bubble {
+    padding:10px 12px;
+    border-radius:12px;
+    line-height:1.35;
+    word-wrap:break-word;
+    box-shadow:0 1px 0 rgba(0,0,0,0.06);
+  }
+  .bubble.user {
+    background:var(--user-bg);
+    color:#04212a;
+    border-bottom-right-radius:6px;
+  }
+  .bubble.assist {
+    background:var(--assist-bg);
+    color:#fff;
+    border-bottom-left-radius:6px;
+    backdrop-filter: blur(4px);
+  }
+  .inputRow { display:flex; gap:8px; background:transparent !important; }
+  textarea {
+    flex:1;
+    min-height:44px;
+    max-height:140px;
+    resize:vertical;
+    padding:8px;
+    border-radius:8px;
     border:1px solid rgba(255,255,255,0.3);
-    background:transparent;      /* removed solid background */
+    background:transparent !important;
     color:#fff;
   }
-  button{
-    background:rgba(11,132,255,0.8);
-    color:#fff;border:none;padding:10px 14px;border-radius:8px;cursor:pointer
+  button {
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    padding:10px 14px;
+    border-radius:8px;
+    cursor:pointer;
   }
   button[disabled]{opacity:.6;cursor:not-allowed}
-  .small{font-size:12px;color:rgba(255,255,255,0.75)}
-  .status{font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px}
 </style>
 </head>
 <body>
   <div class="wrap">
     <div style="display:flex;justify-content:space-between;align-items:center;">
-      <strong class="small">Medic Bot</strong>
-      <span class="small" id="info">Connected</span>
+      <strong style="color:#fff">Medic Bot</strong>
+      <span style="color:#ccc" id="info">Connected</span>
     </div>
 
     <div id="chat" class="chat"></div>
-    <div class="status small" id="status"></div>
+    <div id="status" style="font-size:12px;color:#ccc;"></div>
 
     <div class="inputRow">
       <textarea id="msg" placeholder="Type your message..."></textarea>
@@ -52,14 +95,12 @@
   </div>
 
 <script>
-(function(){
+(async function(){
   const API_URL = "https://apifreellm.com/api/chat";
   const chat = document.getElementById('chat');
   const msg = document.getElementById('msg');
   const sendBtn = document.getElementById('send');
   const status = document.getElementById('status');
-  const info = document.getElementById('info');
-  let sending = false;
 
   function addMessage(text, who){
     const row = document.createElement('div');
@@ -73,29 +114,43 @@
   }
 
   async function callApi(message){
-    if(sending) return;
-    sending = true; sendBtn.disabled = true; status.textContent = 'Sending…';
-    try{
-      const res = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ message })});
-      const data = await res.json();
-      if(data.status==='success'){ status.textContent=''; return data.response; }
-      throw new Error(data.response||'API error');
-    }catch(e){ status.textContent='Error: '+(e.message||e); throw e; }
-    finally{ sending=false; sendBtn.disabled=false; }
+    const res = await fetch(API_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ message })
+    });
+    const data = await res.json();
+    if(data.status === 'success'){
+      return data.response;
+    } else {
+      throw new Error(data.response || 'API error');
+    }
   }
 
   async function send(){
-    const text = msg.value.trim(); if(!text) return;
-    msg.value=''; addMessage(text,'user'); addMessage('…','assist');
-    const bubble = chat.lastChild;
-    try{ const reply = await callApi(text); bubble.remove(); addMessage(reply,'assist'); }
-    catch(e){ bubble.remove(); addMessage('Error: '+(e.message||'Request failed'),'assist'); }
+    const text = msg.value.trim();
+    if(!text) return;
+    msg.value = '';
+    addMessage(text,'user');
+    addMessage('…','assist');
+    const typing = chat.lastChild;
+    try {
+      const reply = await callApi(text);
+      typing.remove();
+      addMessage(reply,'assist');
+    } catch(e){
+      typing.remove();
+      addMessage('Error: ' + e.message,'assist');
+    }
   }
 
-  sendBtn.addEventListener('click', send);
-  msg.addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); } });
-
-  (async()=>{try{await fetch(API_URL,{method:'OPTIONS'}); info.textContent='Connected';}catch(e){info.textContent='Network/CORS?';}})();
+  sendBtn.onclick = send;
+  msg.addEventListener('keydown', e => {
+    if(e.key==='Enter' && !e.shiftKey){
+      e.preventDefault();
+      send();
+    }
+  });
 })();
 </script>
 </body>
