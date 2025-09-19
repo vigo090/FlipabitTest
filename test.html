@@ -7,13 +7,13 @@
 <style>
   :root {
     --accent: #0b84ff;
-    --user-bg: rgba(11,132,255,0.2); /* semi-transparent */
-    --assist-bg: rgba(0,0,0,0.35);
+    --user-bg: rgba(11,132,255,0.2); /* semi-transparent user bubble */
+    --assist-bg: rgba(0,0,0,0.35);   /* semi-transparent bot bubble */
   }
   html, body {
     height:100%;
     margin:0;
-    background:transparent !important;
+    background:transparent !important; /* no solid background */
     font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
   }
   .wrap {
@@ -24,7 +24,7 @@
     gap:8px;
     padding:12px;
     box-sizing:border-box;
-    background:transparent !important;
+    background:transparent !important; /* force transparency */
   }
   .chat {
     flex:1;
@@ -33,7 +33,7 @@
     display:flex;
     flex-direction:column;
     gap:8px;
-    background:transparent !important;
+    background:transparent !important; /* transparent behind bubbles */
   }
   .row { display:flex; max-width:90%; align-items:flex-end; }
   .row.user { justify-content:flex-end; margin-left:auto; }
@@ -63,12 +63,9 @@
     resize:vertical;
     padding:8px;
     border-radius:8px;
-    border:1px solid rgba(0,0,0,0.3);
+    border:1px solid rgba(255,255,255,0.3);
     background:transparent !important;
-    color:#000; /* black text */
-  }
-  textarea::placeholder {
-    color:#444; /* dark gray placeholder */
+    color:#000; /* black text inside textarea */
   }
   button {
     background:var(--accent);
@@ -83,8 +80,14 @@
 </head>
 <body>
   <div class="wrap">
-    <!-- Removed header and status -->
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <strong style="color:#fff">Medic Bot</strong>
+      <span style="color:#ccc" id="info"></span>
+    </div>
+
     <div id="chat" class="chat"></div>
+    <div id="status" style="font-size:12px;color:#ccc;"></div>
+
     <div class="inputRow">
       <textarea id="msg" placeholder="Type your message..."></textarea>
       <button id="send">Send</button>
@@ -97,6 +100,7 @@
   const chat = document.getElementById('chat');
   const msg = document.getElementById('msg');
   const sendBtn = document.getElementById('send');
+  const status = document.getElementById('status');
 
   function addMessage(text, who){
     const row = document.createElement('div');
